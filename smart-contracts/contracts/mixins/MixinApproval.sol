@@ -3,6 +3,7 @@ pragma solidity 0.5.12;
 import '../interfaces/IERC721.sol';
 import './MixinDisableAndDestroy.sol';
 import './MixinKeys.sol';
+import './MixinSignatures.sol';
 
 
 /**
@@ -14,6 +15,7 @@ import './MixinKeys.sol';
  */
 contract MixinApproval is
   IERC721,
+  MixinSignatures,
   MixinDisableAndDestroy,
   MixinKeys
 {
@@ -53,16 +55,10 @@ contract MixinApproval is
   function approve(
     address _approved,
     uint _tokenId
-  )
-    external
-    payable
-    onlyIfAlive
+  ) external
     onlyKeyOwnerOrApproved(_tokenId)
   {
-    require(msg.sender != _approved, 'APPROVE_SELF');
-
-    approved[_tokenId] = _approved;
-    emit Approval(ownerOf[_tokenId], _approved, _tokenId);
+    _approve(_tokenId, _approved);
   }
 
   /**
@@ -75,7 +71,6 @@ contract MixinApproval is
     address _to,
     bool _approved
   ) external
-    onlyIfAlive
   {
     require(_to != msg.sender, 'APPROVE_SELF');
     ownerToOperatorApproved[msg.sender][_to] = _approved;
@@ -108,6 +103,55 @@ contract MixinApproval is
     returns (bool)
   {
     return ownerToOperatorApproved[_owner][_operator];
+  }
+
+  /**
+   */
+  function getPermitHash(
+    address _keyOwner,
+    address _spender
+  ) public view
+    returns (bytes32 approvalHash)
+  {
+    return keccak256(
+      abi.encodePacked(
+        // Approval is specific to this Lock
+        address(this),
+        // Approval enables only one cancel call
+        keyOwnerToNonce[_keyOwner],
+        // Approval allows an account to transfer on their behalf
+        _spender
+      )
+    );
+  }
+
+  /**
+   * @notice Allows the _spender to transferFrom the _keyOwner, given the _keyOwner's
+   * signature approval.  Anyone can submit this transaction.
+   */
+  function permit(
+    address _keyOwner,
+    address _spender,
+    bytes calldata _signature
+  ) external
+    consumeOffchainApproval(getPermitHash(_keyOwner, _spender), _signature, _keyOwner)
+  {
+    _approve(keyByOwner[_keyOwner], _spender);
+  }
+
+  /**
+   * This approves _approved to get ownership of _tokenId.
+   */
+  function _approve(
+    address _approved,
+    uint _tokenId
+  ) internal
+  {
+    address owner = ownerOf[_tokenId];
+    require(owner != _approved, 'APPROVE_SELF');
+
+    approved[_tokenId] = _approved;
+    emit Approval(owner, _approved, _tokenId);
   }
 
   /**
