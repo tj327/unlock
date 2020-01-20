@@ -124,9 +124,7 @@ export default class WalletService extends UnlockService {
       transactionType,
       'submitted'
     )
-    const finalTransaction = await transaction.wait() // TODO: why do we wait here? This should return instantly: getting a hash should not require i/o
-    return finalTransaction.hash
-    // errors fall through
+    return transaction.hash
   }
 
   /**
