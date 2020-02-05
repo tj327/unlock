@@ -11,9 +11,9 @@ import './MixinEventHooks.sol';
 
 contract MixinRefunds is
   Ownable,
-  MixinSignatures,
   MixinFunds,
   MixinLockCore,
+  MixinSignatures,
   MixinKeys,
   MixinEventHooks
 {
@@ -73,7 +73,7 @@ contract MixinRefunds is
   /**
    * @dev Cancels a key owned by a different user and sends the funds to the msg.sender.
    * @param _keyOwner this user's key will be canceled
-   * @param _v _r _s getCancelAndRefundApprovalHash signed by the _keyOwner
+   * @param _v _r _s getCancelAndRefundApproval digest signed by the _keyOwner
    */
   function cancelAndRefundFor(
     address _keyOwner,
@@ -81,14 +81,23 @@ contract MixinRefunds is
     bytes32 _r,
     bytes32 _s
   ) external
-    consumeOffchainApproval(
-      getCancelAndRefundApprovalHash(_keyOwner, msg.sender),
+  {
+    _consumeOffchainApproval(
       _keyOwner,
+      keccak256(
+        abi.encodePacked(
+          // The specific function the signer is approving
+          CANCEL_TYPEHASH,
+          // Approval allows only one account to broadcast the tx
+          msg.sender,
+          // Approval enables only one cancel call
+          keyOwnerToNonce[_keyOwner]
+        )
+      ),
       _v,
       _r,
       _s
-    )
-  {
+    );
     uint refund = _getCancelAndRefundValue(_keyOwner);
     _cancelAndRefund(_keyOwner, refund);
   }
@@ -125,33 +134,6 @@ contract MixinRefunds is
     returns (uint refund)
   {
     return _getCancelAndRefundValue(_owner);
-  }
-
-  /**
-   * @notice returns the hash to sign in order to allow another user to cancel on your behalf.
-   * @dev this can be computed in JS instead of read from the contract.
-   * @param _keyOwner The key owner's address (also the message signer)
-   * @param _txSender The address cancelling cancel on behalf of the keyOwner
-   * @return approvalHash The hash to sign
-   */
-  function getCancelAndRefundApprovalHash(
-    address _keyOwner,
-    address _txSender
-  ) public view
-    returns (bytes32 approvalHash)
-  {
-    return keccak256(
-      abi.encodePacked(
-        // Approval is specific to this Lock
-        address(this),
-        // The specific function the signer is approving
-        CANCEL_TYPEHASH,
-        // Approval enables only one cancel call
-        keyOwnerToNonce[_keyOwner],
-        // Approval allows only one account to broadcast the tx
-        _txSender
-      )
-    );
   }
 
   /**

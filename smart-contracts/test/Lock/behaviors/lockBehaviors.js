@@ -5,6 +5,7 @@ const { tokens } = require('hardlydifficult-ethereum-contracts')
 const deployLocks = require('../../helpers/deployLocks')
 const getProxy = require('../../helpers/proxy')
 const { getBalanceBehavior } = require('./getBalance.behavior')
+const { cancelAndRefundFor } = require('./cancelAndRefundFor.behavior')
 
 const unlockContract = artifacts.require('../Unlock.sol')
 
@@ -43,6 +44,7 @@ contract('Lock / lockBehaviors', accounts => {
 
       // Additional "behaviors" may be added here
       getBalanceBehavior(this)
+      cancelAndRefundFor(this)
     })
   })
 })

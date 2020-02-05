@@ -1,10 +1,14 @@
 pragma solidity 0.5.16;
 
-import '@openzeppelin/contracts-ethereum-package/contracts/cryptography/ECDSA.sol';
+import '../UnlockUtils.sol';
+import './MixinLockCore.sol';
 
 
-contract MixinSignatures
+contract MixinSignatures is
+  MixinLockCore
 {
+  using UnlockUtils for uint;
+
   /// @notice emits anytime the nonce used for off-chain approvals changes.
   event NonceChanged(
     address indexed keyOwner,
@@ -14,27 +18,68 @@ contract MixinSignatures
   // Stores a nonce per user to use for signed messages
   mapping(address => uint) public keyOwnerToNonce;
 
+  // EIP-712
+  bytes32 private constant EIP712DOMAIN_TYPEHASH = keccak256(
+    'EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)'
+  );
+  /// @notice the separator used for signing messages
+  /// @dev from EIP-712
+  bytes32 public DOMAIN_SEPARATOR;
+
+  function getChainId(
+  ) private pure
+    returns (uint id)
+  {
+    // solium-disable-next-line
+    assembly
+    {
+      id := chainid()
+    }
+  }
+
+  function _initializeMixinSignatures(
+  ) internal
+  {
+    DOMAIN_SEPARATOR = keccak256(
+      abi.encode(
+        EIP712DOMAIN_TYPEHASH,
+        keccak256(bytes('PublicLock')),
+        keccak256(bytes(publicLockVersion().uint2Str())),
+        getChainId(),
+        address(this)
+      )
+    );
+  }
+
   /// @notice Validates an off-chain approval signature.
   /// @dev If valid the nonce is consumed, else revert.
-  modifier consumeOffchainApproval(
+  /// Follows EIP-712
+  /// @param _hash must include the account's keyOwnerToNonce value
+  function _consumeOffchainApproval(
+    address _signingAccount,
     bytes32 _hash,
-    address _keyOwner,
     uint8 _v,
     bytes32 _r,
     bytes32 _s
-  )
+  ) internal
   {
     require(
       ecrecover(
-        ECDSA.toEthSignedMessageHash(_hash),
+        keccak256(
+          abi.encodePacked(
+            // Prefix as per EIP-712
+            '\x19\x01',
+            DOMAIN_SEPARATOR,
+            _hash
+          )
+        ),
         _v,
         _r,
         _s
-      ) == _keyOwner, 'INVALID_SIGNATURE'
+      ) == _signingAccount, 'INVALID_SIGNATURE'
     );
-    keyOwnerToNonce[_keyOwner]++;
-    emit NonceChanged(_keyOwner, keyOwnerToNonce[_keyOwner]);
-    _;
+    keyOwnerToNonce[_signingAccount]++;
+    emit NonceChanged(_signingAccount, keyOwnerToNonce[_signingAccount]);
   }
 
   /**
