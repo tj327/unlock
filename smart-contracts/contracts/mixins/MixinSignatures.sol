@@ -54,7 +54,7 @@ contract MixinSignatures is
   /// @notice Validates an off-chain approval signature.
   /// @dev If valid the nonce is consumed, else revert.
   /// Follows EIP-712
-  /// @param _hash must include the account's keyOwnerToNonce value
+  /// @param _hash must include a typehash, the params, and the account's keyOwnerToNonce value
   function _consumeOffchainApproval(
     address _signingAccount,
     bytes32 _hash,

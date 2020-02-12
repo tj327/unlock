@@ -83,14 +83,13 @@ contract MixinRefunds is
   ) external
   {
     _consumeOffchainApproval(
+      // The only param, keyOwner, must be the signer
       _keyOwner,
       keccak256(
         abi.encodePacked(
           // The specific function the signer is approving
           CANCEL_TYPEHASH,
-          // Approval allows only one account to broadcast the tx
-          msg.sender,
-          // Approval enables only one cancel call
+          // The sig enables only one cancel call and it may be invalidated
           keyOwnerToNonce[_keyOwner]
         )
       ),

@@ -1,21 +1,19 @@
+const sigUtil = require('eth-sig-util')
 const BigNumber = require('bignumber.js')
 const { eventEmitted, reverts } = require('truffle-assertions')
 
-function fixSignature(signature) {
-  // in geth its always 27/28, in ganache its 0/1. Change to 27/28 to prevent
-  // signature malleability if version is 0/1
-  // see https://github.com/ethereum/go-ethereum/blob/v1.8.23/internal/ethapi/api.go#L465
-  let v = parseInt(signature.slice(130, 132), 16)
-  if (v < 27) {
-    v += 27
-  }
-  const vHex = v.toString(16)
-  return signature.slice(0, 130) + vHex
-}
+const testAccount = web3.eth.accounts.privateKeyToAccount(
+  web3.utils.keccak256('cow')
+)
 
 // signs message
-async function signMessage(messageHex, signer) {
-  const signature = fixSignature(await web3.eth.sign(messageHex, signer))
+async function signMessage(messageHex, from) {
+  const signature = sigUtil.signTypedData(
+    // TODO
+    Buffer.from(testAccount.privateKey.substr(2), 'hex'),
+    { data: messageHex }
+  )
+  console.log(signature)
   const v = `0x${signature.slice(130, 132)}`
   const r = signature.slice(0, 66)
   const s = `0x${signature.slice(66, 130)}`
@@ -38,10 +36,16 @@ module.exports.cancelAndRefundFor = options => {
       keyPrice = new BigNumber(await lock.keyPrice())
 
       const purchases = keyOwners.map(account => {
-        return lock.purchase(0, account, web3.utils.padLeft(0, 40), [], {
-          value: keyPrice.toFixed(),
-          from: account,
-        })
+        return lock.purchase(
+          keyPrice.toFixed(),
+          account,
+          web3.utils.padLeft(0, 40),
+          [],
+          {
+            value: lock.isErc20 ? 0 : keyPrice.toFixed(),
+            from: account,
+          }
+        )
       })
       await Promise.all(purchases)
       lockOwner = await lock.owner.call()
@@ -77,19 +81,34 @@ module.exports.cancelAndRefundFor = options => {
         initialTxSenderBalance = new BigNumber(
           await web3.eth.getBalance(txSender)
         )
-        const message = await lock.getCancelAndRefundApprovalHash(
-          keyOwners[0],
-          txSender,
-          {
-            from: keyOwners[0],
-          }
-        )
-        const digest = await lock.getMessageDigest(message, {
-          from: keyOwners[0],
-        })
-        const signature = await signMessage(digest, keyOwners[0])
+        const msgParams = {
+          types: {
+            EIP712Domain: [
+              { name: 'name', type: 'string' },
+              { name: 'version', type: 'string' },
+              { name: 'chainId', type: 'uint256' },
+              { name: 'verifyingContract', type: 'address' },
+            ],
+            CancelAndRefundFor: [{ name: 'nonce', type: 'uint256' }],
+          },
+          primaryType: 'CancelAndRefundFor',
+          domain: {
+            name: 'PublicLock',
+            version: web3.utils.keccak256(
+              (await lock.publicLockVersion()).toString()
+            ),
+            // Ganache chainId bug: https://github.com/trufflesuite/ganache-core/issues/515
+            chainId: '1',
+            verifyingContract: lock.address,
+          },
+          message: {
+            nonce: (await lock.keyOwnerToNonce(keyOwners[0])).toString(),
+          },
+        }
+        console.log(msgParams)
+        const signature = await signMessage(msgParams, keyOwners[0])
         txObj = await lock.cancelAndRefundFor(
-          keyOwners[0],
+          testAccount.address,
           signature.v,
           signature.r,
           signature.s,
@@ -102,7 +121,7 @@ module.exports.cancelAndRefundFor = options => {
         )
       })
 
-      it('the amount of refund should be greater than 0', async () => {
+      it.only('the amount of refund should be greater than 0', async () => {
         eventEmitted(txObj, 'CancelKey', e => {
           const refund = new BigNumber(e.refund)
           return refund.gt(0) && refund.toFixed() === withdrawAmount.toFixed()
@@ -190,10 +209,16 @@ module.exports.cancelAndRefundFor = options => {
             from: txSender,
           }
         )
-        await lock.purchase(0, keyOwners[2], web3.utils.padLeft(0, 40), [], {
-          from: keyOwners[2],
-          value: keyPrice.toFixed(),
-        })
+        await lock.purchase(
+          keyPrice.toFixed(),
+          keyOwners[2],
+          web3.utils.padLeft(0, 40),
+          [],
+          {
+            from: keyOwners[2],
+            value: lock.isErc20 ? 0 : keyPrice.toFixed(),
+          }
+        )
         await reverts(
           lock.cancelAndRefundFor(
             keyOwners[2],
