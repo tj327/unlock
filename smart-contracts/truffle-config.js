@@ -140,5 +140,5 @@ module.exports = {
       gasPrice: 5,
     },
   },
-  plugins: ['truffle-security'],
+  plugins: ['solidity-coverage'],
 }
