@@ -126,7 +126,7 @@ describe('useProvider', () => {
         expect(mockWeb3ProviderContext.setWeb3Provider).toHaveBeenCalledWith(
           ethereumWindow.ethereum
         )
-        expect(mockDispatch).toHaveBeenCalledTimes(3)
+        expect(mockDispatch).toHaveBeenCalledTimes(4)
         expect(ethereumWindow.ethereum.enable).toHaveBeenCalled()
         expect(result.current).toEqual({
           provider: ethereumWindow.ethereum,

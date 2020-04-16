@@ -8,12 +8,10 @@ import {
   UPDATE_LOCK,
 } from '../../actions/lock'
 import { LAUNCH_MODAL, DISMISS_MODAL } from '../../actions/fullScreenModals'
-import { SET_ACCOUNT, UPDATE_ACCOUNT } from '../../actions/accounts'
 import { SET_NETWORK } from '../../actions/network'
 import { PROVIDER_READY } from '../../actions/provider'
 import { NEW_TRANSACTION } from '../../actions/transaction'
 import { SET_ERROR } from '../../actions/error'
-import { ACCOUNT_POLLING_INTERVAL } from '../../constants'
 import { TransactionType } from '../../unlockTypes'
 import {
   FATAL_NO_USER_ACCOUNT,
@@ -21,7 +19,6 @@ import {
   FATAL_WRONG_NETWORK,
 } from '../../errors'
 import { HIDE_FORM } from '../../actions/lockFormVisibility'
-import { GET_STORED_PAYMENT_DETAILS } from '../../actions/user'
 import { SIGN_DATA } from '../../actions/signature'
 
 let mockConfig
@@ -110,98 +107,6 @@ beforeEach(() => {
 })
 
 describe('Wallet middleware', () => {
-  describe('when receiving account.updated events triggered by the walletService', () => {
-    it('should handle non-redundant account.updated events', () => {
-      expect.assertions(2)
-      const { store } = create()
-      const emailAddress = 'geoff@bitconnect.gov'
-      const update = {
-        emailAddress,
-      }
-
-      mockWalletService.emit('account.updated', update)
-
-      expect(store.dispatch).toHaveBeenNthCalledWith(
-        1,
-        expect.objectContaining({
-          type: UPDATE_ACCOUNT,
-          update: {
-            emailAddress,
-          },
-        })
-      )
-
-      expect(store.dispatch).toHaveBeenNthCalledWith(
-        2,
-        expect.objectContaining({
-          type: GET_STORED_PAYMENT_DETAILS,
-          emailAddress,
-        })
-      )
-    })
-
-    it('should not dispatch redundant updates triggered by the walletService', () => {
-      expect.assertions(1)
-      const { store } = create()
-      const update = {
-        address: '0xabc',
-      }
-
-      mockWalletService.emit('account.updated', update)
-
-      expect(store.dispatch).not.toHaveBeenCalled()
-    })
-  })
-
-  it('should handle account.changed events triggered by the walletService', () => {
-    expect.assertions(3)
-    const { store } = create()
-    const address = '0x123'
-    const account = {
-      address,
-    }
-    setTimeout.mockClear()
-    mockWalletService.getAccount = jest.fn()
-
-    mockWalletService.emit('account.changed', address)
-
-    expect(store.dispatch).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: SET_ACCOUNT,
-        account,
-      })
-    )
-
-    expect(setTimeout).toHaveBeenCalledTimes(1)
-    expect(setTimeout).toHaveBeenCalledWith(
-      expect.any(Function),
-      ACCOUNT_POLLING_INTERVAL
-    )
-  })
-
-  it('on the server, it should not handle account.changed events triggered by the walletService', () => {
-    expect.assertions(2)
-    setTimeout.mockClear()
-    mockConfig.isServer = true
-    const { store } = create()
-    const address = '0x123'
-    const account = {
-      address,
-    }
-    mockWalletService.getAccount = jest.fn()
-
-    mockWalletService.emit('account.changed', address)
-
-    expect(store.dispatch).not.toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: SET_ACCOUNT,
-        account,
-      })
-    )
-
-    expect(setTimeout).not.toHaveBeenCalled()
-  })
-
   it('should handle transaction.pending events triggered by the walletService', () => {
     expect.assertions(1)
     const { store } = create()

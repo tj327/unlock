@@ -4,6 +4,7 @@ import { providerReady } from '../actions/provider'
 import { waitForWallet, dismissWalletCheck } from '../actions/fullScreenModals'
 import { FATAL_NOT_ENABLED_IN_PROVIDER } from '../errors'
 import { setError } from '../actions/error'
+import { setAccount } from '../actions/accounts'
 
 import { Application } from '../utils/Error'
 
@@ -51,27 +52,39 @@ export const useProvider = () => {
     }
 
     const ethereumWindow = (window as unknown) as EthereumWindow
+    let provider = null
+    let account = null
 
     // If there is an injected provider
     if (ethereumWindow.ethereum) {
       dispatch(waitForWallet())
       try {
         // Request account access if needed
-        await ethereumWindow.ethereum.enable()
-        setWeb3Provider(ethereumWindow.ethereum)
-        dispatch(providerReady())
+        provider = ethereumWindow.ethereum
+        const accounts = await provider.enable()
+        account = {
+          address: accounts[0],
+        }
       } catch (error) {
         dispatch(setError(Application.Fatal(FATAL_NOT_ENABLED_IN_PROVIDER)))
       }
       dispatch(dismissWalletCheck())
     } else if (ethereumWindow.web3) {
       // Legacy web3 wallet/browser (should we keep supporting?)
-      setWeb3Provider(ethereumWindow.web3.currentProvider)
+      provider = ethereumWindow.web3.currentProvider
+      account = provider.selectedAddress
       dispatch(providerReady())
     } else {
       // Hum. No provider!
       // TODO: Let's let the user pick one up from the UI (including the unlock provider!)
     }
+
+    if (provider) {
+      setWeb3Provider(provider)
+      dispatch(setAccount(account))
+      dispatch(providerReady())
+    }
+
     setLoading(false)
   }
 
