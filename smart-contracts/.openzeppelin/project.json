@@ -1,6 +1,7 @@
 {
   "manifestVersion": "2.2",
   "contracts": {
+    "PublicLock": "PublicLock",
     "Unlock": "Unlock",
     "UnlockDiscountToken": "UnlockDiscountToken"
   },
