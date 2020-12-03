@@ -86,7 +86,7 @@
     "request": "2.88.2",
     "request-promise-native": "1.0.8",
     "run-script-os": "1.1.1",
-    "sequelize": "5.21.11",
+    "sequelize": "6.3.5",
     "sequelize-cli": "6.1.0",
     "sequelize-typescript": "1.1.0",
     "stripe": "7.15.0",
